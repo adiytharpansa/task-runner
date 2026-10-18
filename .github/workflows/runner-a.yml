@@ -1,0 +1,69 @@
+name: Runner A
+
+on:
+  workflow_dispatch:
+    inputs:
+      max_episodes:
+        description: "Limit per shard"
+        required: false
+        default: "20"
+      concurrency:
+        description: "Parallel per shard"
+        required: false
+        default: "5"
+      dry_run:
+        description: "Dry run"
+        type: boolean
+        required: false
+        default: false
+
+concurrency:
+  group: runner-fast
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          repository: adiytharpansa/Sinkron2.0
+          path: src
+          ssh-key: ${{ secrets.SYNC_DEPLOY_KEY }}
+          persist-credentials: false
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: src/package-lock.json
+      - name: Restore state
+        uses: actions/cache@v4
+        with:
+          path: src/.sync-cache.json
+          key: state-fast-${{ matrix.shard }}-${{ github.run_id }}
+          restore-keys: |
+            state-fast-${{ matrix.shard }}-
+      - name: Run task
+        env:
+          CFG_1: ${{ secrets.CFG_1 }}
+          CFG_2: ${{ secrets.CFG_2 }}
+          CFG_3: ${{ secrets.CFG_3 }}
+          SHARD_INDEX: ${{ matrix.shard }}
+          CONCURRENCY: ${{ inputs.concurrency || '5' }}
+          SYNC_MAX: ${{ inputs.max_episodes || '20' }}
+        working-directory: src
+        run: |
+          rc=0
+          node shell-run.mjs fast ${{ inputs.dry_run && '--dry-run' || '' }} > ../run.log 2>&1 || rc=$?
+          echo "run finished rc=$rc"
+          exit $rc
