@@ -1,0 +1,27 @@
+name: Runner C
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Monthly activity
+        run: |
+          printf 'keepalive: %s\n' "$(date -u +%Y-%m-%d)" > .keepalive
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .keepalive
+          if git diff --cached --quiet; then
+            echo "No change this month."
+          else
+            git commit -m "keepalive: monthly activity"
+            git push
+          fi
